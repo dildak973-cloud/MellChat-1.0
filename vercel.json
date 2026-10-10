@@ -1,0 +1,11 @@
+{
+  "functions": { "api/app.js": { "maxDuration": 10 } },
+  "rewrites": [
+    { "source": "/api/:op", "destination": "/api/app?op=:op" },
+    { "source": "/upload", "destination": "/api/app?op=upload" },
+    { "source": "/f/:id", "destination": "/api/app?op=file&id=:id" }
+  ],
+  "headers": [
+    { "source": "/(.*)", "headers": [ { "key": "X-Content-Type-Options", "value": "nosniff" } ] }
+  ]
+}
