@@ -1,22 +1,16 @@
-# Mell chat на Vercel
+# Mell chat — всё в одной папке (без вложенных папок)
 
-## Деплой
-1. Залейте папку в GitHub (или `npx vercel` из этой папки).
-2. Vercel → New Project → выберите репозиторий. **Framework Preset: Other**, Build Command и Output Directory — пустые.
-3. Проект → **Storage**:
-   - **Upstash Redis** (Marketplace) → Create → Connect Project (переменные подставятся сами);
-   - **Blob** → Create → Connect Project (даст `BLOB_READ_WRITE_TOKEN`).
-4. Redeploy.
-5. (Необязательно) ключ Google Maps JS API — в начале `index.html`: `window.MELL={gmapsKey:'...'}`.
+Файлы: `index.html`, `shim.js`, `config.js`, `send.png`, `clip.png` — сайт;
+`app.js`, `store.js`, `vercel.json`, `package.json` — бэкенд для Vercel.
 
-## Что внутри
-- `index.html`, `shim.js` — приложение;
-- `api/app.js` — весь бэкенд (регистрация, вход, синхронизация, файлы, звонки), роуты — в `vercel.json`;
-- `lib/store.js` — Upstash Redis + Vercel Blob.
+## Установка
+1. Загрузите ВСЕ файлы в корень репозитория на GitHub (ветка `main`).
+2. **Бэкенд:** vercel.com → New Project → этот репозиторий, Framework Preset: **Other**.
+   Storage: добавьте **Upstash Redis** и **Blob** → Connect Project → Redeploy.
+   Откройте адрес проекта (например `https://mellchat.vercel.app`) — чат уже работает.
+3. **Сайт на GitHub Pages (необязательно):** Settings → Pages → Deploy from a branch → `main` / `(root)`.
+   Затем в `config.js` впишите `api: 'https://ваш-проект.vercel.app'` и сделайте commit.
+4. В Vercel → Environment Variables можно добавить `ALLOWED_ORIGIN=https://<логин>.github.io` и Redeploy.
 
-## Вход
-Cookie `mell_sid` выдаётся на 1 год (HttpOnly, Secure) и продлевается при каждом открытии — после полного закрытия приложения вы остаётесь в аккаунте.
-
-## Ограничения Vercel
-- Файлы до 4 МБ (лимит тела запроса функции).
-- Обновления приходят через long-poll (каждые ~7 с запрос к Redis) — на бесплатном тарифе Upstash лимит команд быстро кончится при большом онлайне.
+Вход хранится токеном `mell_token` в localStorage (1 год, продлевается при открытии).
+Файлы до 4 МБ. Адрес API можно временно задать так: `...github.io/репо/?api=https://ваш-проект.vercel.app`.

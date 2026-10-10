@@ -181,7 +181,8 @@ input[type=range]{padding:0;border:0;background:none}
 @media(max-width:720px){#head [data-a=back]{display:block!important}}
 @media(min-width:721px) and (max-width:1000px){#app{grid-template-columns:280px 1fr}}
 @media(min-width:1500px){#app{grid-template-columns:380px 1fr}}
-@media(max-width:720px){input,textarea{font-size:16px}.btn{min-height:40px}.cmp .btn{padding:8px 10px}#head{padding:8px 10px}#msgs{padding:10px 8px}.mr{max-width:94%}.avs{width:32px;margin:0 8px 0 4px}.avs .av{--s:32px!important}.box{max-height:96%}video.att{width:100%}audio.aud{width:100%}#stp{max-height:36vh}}
+@media(max-width:720px){input,textarea{font-size:16px}.btn{min-height:40px}
+.ico{width:22px;height:22px;display:block;margin:auto;object-fit:contain;pointer-events:none}.cmp .btn{padding:8px 10px}#head{padding:8px 10px}#msgs{padding:10px 8px}.mr{max-width:94%}.avs{width:32px;margin:0 8px 0 4px}.avs .av{--s:32px!important}.box{max-height:96%}video.att{width:100%}audio.aud{width:100%}#stp{max-height:36vh}}
 @media(hover:none){.m:hover .act{display:none}.mr.sel .m .act{display:flex}.act{top:-20px}.act button{padding:6px 9px;font-size:17px}}
 </style></head><body>
 <div id="auth"><div class="card" id="ac"></div></div>
@@ -191,9 +192,9 @@ input[type=range]{padding:0;border:0;background:none}
   <div id="bar"><div id="emo" class="hide"></div><div id="stp" class="hide"></div><div id="ctx" class="hide"></div>
    <div id="up" class="hide"><span id="upt"></span><div class="pbar"><i id="upi"></i></div></div>
    <div id="rec" class="hide"><button class="btn s" data-a="mx" title="Отмена">✕</button><span class="dot"></span><b id="rt">0:00</b><span class="sm" style="flex:1">Идёт запись…</span><button class="btn" data-a="mok" title="Отправить">➤</button></div>
-   <div class="cmp"><button data-a="emo" class="btn s" title="Эмодзи и стикеры">😊</button><button data-a="att" class="btn s" title="Файл, фото, видео">📎</button><textarea id="in" rows="1" placeholder="Сообщение"></textarea><button data-a="mic" class="btn s" title="Голосовое сообщение">🎤</button><button class="btn" data-a="send">➤</button></div></div></section>
+   <div class="cmp"><button data-a="emo" class="btn s" title="Эмодзи и стикеры">😊</button><button data-a="att" class="btn s" title="Файл, фото, видео"><img class="ico" src="clip.png" alt="Файл"></button><textarea id="in" rows="1" placeholder="Сообщение"></textarea><button data-a="mic" class="btn s" title="Голосовое сообщение">🎤</button><button class="btn" data-a="send" title="Отправить"><img class="ico" src="send.png" alt="Отправить"></button></div></div></section>
 </div>
-<script src="shim.js"></script><div id="mod" class="hide"></div><input type="file" id="fk2" accept="image/*" class="hide"><input type="file" id="fk5" accept="image/*" class="hide"><input type="file" id="ff" multiple class="hide">
+<script src="config.js"></script><script src="shim.js"></script><div id="mod" class="hide"></div><input type="file" id="fk2" accept="image/*" class="hide"><input type="file" id="fk5" accept="image/*" class="hide"><input type="file" id="ff" multiple class="hide">
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const img=u=>typeof u==='string'&&u.startsWith('data:image/')?u:'';
@@ -226,7 +227,7 @@ function chats(){const o={};M.forEach(m=>{if(m.c==='general'||m.c.split('_').inc
  return Object.entries(o).sort((a,b)=>(a[0]==='general'?1e15:a[1].t)>(b[0]==='general'?1e15:b[1].t)?-1:1)}
 const peer=c=>U[c]||U[c.split('_').find(x=>x!==uid)||uid];
 /* ---- auth ---- */
-function auth(step){const c=$('#ac'),ck='<p class="sm">🍪 Для входа используется один cookie (mell_sid) — он хранит вашу сессию. Рекламы и трекеров нет.</p>',lg='<div class="logo"><i></i><i></i><i></i></div><h2>Mell chat</h2>';
+function auth(step){const c=$('#ac'),ck='<p class="sm">🔐 Сессия хранится в вашем браузере (один токен mell_token) — после закрытия приложения вы остаётесь в аккаунте. Рекламы и трекеров нет.</p>',lg='<div class="logo"><i></i><i></i><i></i></div><h2>Mell chat</h2>';
  if(step===0)c.innerHTML=`${lg}<p class="sm">Войдите в аккаунт</p><input id="lu" placeholder="username" autocomplete="username" autocapitalize="off" spellcheck="false"><input id="lp" type="password" placeholder="Пароль" autocomplete="current-password"><button class="btn" data-a="login">Войти</button><button class="btn s" data-a="auth" data-v="1">Создать аккаунт</button><button class="lnk" data-a="auth" data-v="3">Старый аккаунт (входил по почте)</button>${ck}`;
  if(step===1)c.innerHTML=`${lg}<h3>Регистрация</h3><input id="rn" placeholder="Имя" maxlength="30" autocomplete="name"><input id="ru" placeholder="username (a-z, 0-9, _)" maxlength="20" autocomplete="username" autocapitalize="off" spellcheck="false"><input id="rp" type="password" placeholder="Пароль (от 6 символов)" autocomplete="new-password"><input id="rp2" type="password" placeholder="Повторите пароль" autocomplete="new-password"><button class="btn" data-a="reg">Создать аккаунт</button><button class="lnk" data-a="auth" data-v="0">← У меня уже есть аккаунт</button>${ck}`;
  if(step===3)c.innerHTML=`${lg}<h3>Вход в старый аккаунт</h3><p class="sm">Раньше вход был по почте. Укажите username и почту этого аккаунта и придумайте пароль — дальше входите по паролю.</p><input id="cu" placeholder="username" autocapitalize="off" spellcheck="false"><input id="ce" type="email" placeholder="Почта аккаунта"><input id="cp" type="password" placeholder="Новый пароль (от 6 символов)" autocomplete="new-password"><button class="btn" data-a="claim">Подтвердить и войти</button><button class="lnk" data-a="auth" data-v="0">← Назад ко входу</button>${ck}`}
@@ -320,13 +321,13 @@ async function start(me){if(started)return;started=1;uid=me.uid;claude.uid=uid;M
  sub('reads',a=>{R={};a.forEach(x=>{(R[x.c]||(R[x.c]={}))[x.u]=x.t});if(!$('#app').classList.contains('hide')){rList();rMsgs()}});
  const rm=await claude.use('room');RM=rm;rm.on('sig',onSig);
  claude.connect()}
-async function boot(){let me=null;try{const r=await fetch('/api/me',{credentials:'same-origin'});if(r.ok)me=await r.json()}catch(e){}me?start(me):(auth(0),$('#lu').value=LS.get('mell_un')||'')}
+async function boot(){let me=null;try{me=await claude.me()}catch(e){}me?start(me):(auth(0),$('#lu').value=LS.get('mell_un')||'')}
 function BC(){return cid(uid,'stickers')}
 function chU(x){return{id:x.id,name:x.n,un:(x.n||'').toLowerCase(),ch:x,av:x.av,bio:x.d}}
 const uid6=()=>uid.replace(/\W/g,'').slice(0,6);
 const body=m=>{if(m.s)return m.s.i?`<img class="sk" src="${img(m.s.i)}">`:`<span class="big an-${esc(m.s.a)}">${esc(m.s.e)}</span>`;const pl=U[m.f]?.plus;
  let h='';const fl=m.fl;
- if(fl){const u='/f/'+esc(fl.id);
+ if(fl){const u=claude.fileUrl(fl.id);
   if(fl.k==='img')h=`<img class="att" src="${u}" alt="${esc(fl.n)}" loading="lazy" data-a="zoom" data-i="${esc(fl.id)}">`;
   else if(fl.k==='video')h=`<video class="att" src="${u}" controls preload="metadata" playsinline></video>`;
   else if(fl.k==='audio')h=`<div class="sm">${m.vm?'🎤 Голосовое · '+mmss(m.du||0):'🎵 '+esc(fl.n)+' · '+fmtS(fl.s)}</div><audio class="aud" data-m="${esc(m.id)}" src="${u}" controls preload="metadata" controlsList="nodownload noplaybackrate" oncontextmenu="return false"></audio>`;
@@ -483,10 +484,7 @@ document.addEventListener('play',ev=>{const a=ev.target;if(!a.classList||!a.clas
   if(stick)el.scrollTop=el.scrollHeight},true))}
 /* загрузка файлов */
 function prog(p,n){const u=$('#up');if(p<0){u.classList.add('hide');return}u.classList.remove('hide');$('#upt').textContent='⬆ '+(n||'файл')+' — '+p+'%';$('#upi').style.width=p+'%'}
-function upFile(f,voice){return new Promise((ok,no)=>{const x=new XMLHttpRequest();x.open('POST','/upload');x.setRequestHeader('Content-Type','application/octet-stream');x.setRequestHeader('X-Name',encodeURIComponent(f.name||'file'));if(voice)x.setRequestHeader('X-Voice','1');
- x.upload.onprogress=e=>e.lengthComputable&&prog(Math.round(e.loaded/e.total*100),f.name);
- x.onload=()=>{let j={};try{j=JSON.parse(x.responseText)}catch(e){}x.status===200?ok(j):no(new Error(j.err||('Ошибка '+x.status)))};
- x.onerror=()=>no(new Error('Нет связи с сервером'));x.send(f)})}
+function upFile(f,voice){return claude.upload(f,voice,e=>e.lengthComputable&&prog(Math.round(e.loaded/e.total*100),f.name))}
 async function sendFiles(fs){if(!chat||chat===BC()||$('#bar').classList.contains('hide'))return;const to=chat;
  for(const f of fs){if(f.size>MAXF){toast('«'+f.name+'» больше '+fmtS(MAXF));continue}if(!f.size){toast('«'+f.name+'» пустой');continue}
   try{prog(0,f.name);const j=await upFile(f),cap=to===chat?$('#in').value.trim():'';
@@ -497,7 +495,7 @@ $('#ff').addEventListener('change',e=>{const l=[...e.target.files];e.target.valu
 $('#in').addEventListener('paste',e=>{const l=[...(e.clipboardData?.files||[])];if(l.length){e.preventDefault();sendFiles(l)}});
 ['dragover','drop'].forEach(n=>$('#main').addEventListener(n,e=>{if(!e.dataTransfer||![...e.dataTransfer.types].includes('Files'))return;e.preventDefault();if(n==='drop')sendFiles([...e.dataTransfer.files])}));
 A.zoom=(_,e)=>{const id=e.dataset.i,m=M.find(x=>x.fl&&x.fl.id===id),n=m?m.fl.n:'image',d=$('#mod');d.classList.remove('hide');
- d.innerHTML=`<div style="display:grid;gap:10px;justify-items:center;max-width:100%"><img src="/f/${esc(id)}" alt="" style="max-width:96vw;max-height:80vh;border-radius:14px;object-fit:contain"><div style="display:flex;gap:8px"><a class="btn s" href="/f/${esc(id)}?dl=1" download="${esc(n)}" style="text-decoration:none">⬇ Скачать</a><button class="btn s" data-a="close">Закрыть</button></div></div>`};
+ d.innerHTML=`<div style="display:grid;gap:10px;justify-items:center;max-width:100%"><img src="${claude.fileUrl(id)}" alt="" style="max-width:96vw;max-height:80vh;border-radius:14px;object-fit:contain"><div style="display:flex;gap:8px"><a class="btn s" href="${claude.fileUrl(id,1)}" download="${esc(n)}" style="text-decoration:none">⬇ Скачать</a><button class="btn s" data-a="close">Закрыть</button></div></div>`};
 /* голосовые сообщения */
 function recTick(){if(!rec)return;const s=(Date.now()-rec.t0)/1000;$('#rt').textContent=mmss(s);if(s>=300)recStop(true)}
 A.mic=async()=>{if(rec)return;if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder)return toast('Запись недоступна: нужен https (mellchat.com) или localhost');

@@ -1,11 +1,18 @@
 {
-  "functions": { "api/app.js": { "maxDuration": 10 } },
-  "rewrites": [
-    { "source": "/api/:op", "destination": "/api/app?op=:op" },
-    { "source": "/upload", "destination": "/api/app?op=upload" },
-    { "source": "/f/:id", "destination": "/api/app?op=file&id=:id" }
+  "version": 2,
+  "builds": [
+    { "src": "app.js", "use": "@vercel/node", "config": { "maxDuration": 10 } },
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "shim.js", "use": "@vercel/static" },
+    { "src": "config.js", "use": "@vercel/static" },
+    { "src": "send.png", "use": "@vercel/static" },
+    { "src": "clip.png", "use": "@vercel/static" }
   ],
-  "headers": [
-    { "source": "/(.*)", "headers": [ { "key": "X-Content-Type-Options", "value": "nosniff" } ] }
+  "routes": [
+    { "src": "/api/([^/]+)", "dest": "/app.js?op=$1" },
+    { "src": "/upload", "dest": "/app.js?op=upload" },
+    { "src": "/f/([^/]+)", "dest": "/app.js?op=file&id=$1" },
+    { "src": "/", "dest": "/index.html" },
+    { "handle": "filesystem" }
   ]
 }
