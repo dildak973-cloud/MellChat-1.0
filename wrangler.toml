@@ -1,0 +1,19 @@
+name = "mellchat"
+main = "_worker.js"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Сайт (index.html, shim.js, картинки) отдаётся из этой же папки; бэкенд — только для этих путей
+[assets]
+directory = "./"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/upload", "/f/*"]
+
+# Данные: Cloudflare создаст базу и бакет сам при первом деплое
+[[d1_databases]]
+binding = "DB"
+database_name = "mellchat"
+
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "mellchat-files"

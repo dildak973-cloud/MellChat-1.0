@@ -1,70 +1,81 @@
-/* Хранилище: Upstash Redis (данные) + Vercel Blob (файлы).
-   Для локальных тестов: MELL_FAKE=1 — всё в памяти. */
-let impl;
+/* Хранилище на Cloudflare: D1 (данные, SQLite) + R2 (файлы). Интерфейс тот же, что был у Redis. */
+let env, ready;
+const now = () => Date.now();
+const J = JSON.stringify;
+const P = s => (s == null ? null : JSON.parse(s));
+const q = (sql, ...a) => env.DB.prepare(sql).bind(...a);
+const rows = async st => (await st.all()).results || [];
+const chunks = (a, n) => { const o = []; for (let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; };
 
-function real() {
-  const { Redis } = require('@upstash/redis');
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
-  if (!url || !token) throw new Error('Redis не подключён: добавьте Upstash Redis во вкладке Storage проекта на Vercel');
-  const r = new Redis({ url, token });
-  return {
-    get: k => r.get(k),
-    set: (k, v, o) => r.set(k, v, o || {}),
-    del: k => r.del(k),
-    incr: k => r.incr(k),
-    expire: (k, s) => r.expire(k, s),
-    hget: (k, f) => r.hget(k, f),
-    hset: (k, f, v) => r.hset(k, { [f]: v }),
-    hdel: (k, f) => r.hdel(k, f),
-    hgetall: k => r.hgetall(k),
-    hmget: async (k, fs) => { const o = (await r.hmget(k, ...fs)) || {}; return fs.map(f => (o[f] === undefined ? null : o[f])); },
-    zadd: (k, score, member) => r.zadd(k, { score, member }),
-    zfrom: async (k, min, count) => {
-      const a = await r.zrange(k, min, '+inf', { byScore: true, offset: 0, count, withScores: true });
-      const out = []; for (let i = 0; i < a.length; i += 2) out.push({ m: String(a[i]), s: Number(a[i + 1]) });
-      return out;
-    },
-    ztrim: (k, keep) => r.zremrangebyrank(k, 0, -(keep + 1)),
-    rpush: (k, v) => r.rpush(k, v),
-    lpopall: async k => { const l = await r.lrange(k, 0, -1); if (l.length) await r.del(k); return l; },
-    blobPut: async (path, buf, mime) => {
-      if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error('Хранилище файлов не подключено: добавьте Vercel Blob во вкладке Storage');
-      const { put } = require('@vercel/blob');
-      const x = await put(path, buf, { access: 'public', contentType: mime, addRandomSuffix: true });
-      return x.url;
-    },
-    blobGet: async (url, range) => {
-      const x = await fetch(url, { headers: range ? { range } : {} });
-      return { status: x.status, headers: x.headers, body: Buffer.from(await x.arrayBuffer()) };
+const SCHEMA = [
+  'CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT NOT NULL, exp INTEGER)',
+  'CREATE TABLE IF NOT EXISTS h(k TEXT NOT NULL, f TEXT NOT NULL, v TEXT NOT NULL, PRIMARY KEY(k,f)) WITHOUT ROWID',
+  'CREATE TABLE IF NOT EXISTS z(k TEXT NOT NULL, m TEXT NOT NULL, s INTEGER NOT NULL, PRIMARY KEY(k,m)) WITHOUT ROWID',
+  'CREATE INDEX IF NOT EXISTS z_s ON z(k,s)',
+  'CREATE TABLE IF NOT EXISTS l(id INTEGER PRIMARY KEY AUTOINCREMENT, k TEXT NOT NULL, v TEXT NOT NULL, ts INTEGER NOT NULL)',
+  'CREATE INDEX IF NOT EXISTS l_k ON l(k)'
+];
+
+module.exports = {
+  async init(e) {
+    env = e;
+    if (!env.DB) throw new Error('База D1 не подключена: проверьте binding DB в wrangler.toml');
+    if (!ready) ready = env.DB.batch(SCHEMA.map(s => env.DB.prepare(s))).catch(err => { ready = null; throw err; });
+    await ready;
+  },
+  async get(k) { const r = await q('SELECT v FROM kv WHERE k=?1 AND (exp IS NULL OR exp>?2)', k, now()).first(); return r ? P(r.v) : null; },
+  async set(k, v, o) {
+    const exp = o && o.ex ? now() + o.ex * 1000 : null;
+    if (Math.random() < 0.01) await q('DELETE FROM kv WHERE exp IS NOT NULL AND exp<?1', now()).run();
+    if (o && o.nx) {
+      const r = await q('INSERT INTO kv(k,v,exp) VALUES(?1,?2,?3) ON CONFLICT(k) DO UPDATE SET v=excluded.v, exp=excluded.exp WHERE kv.exp IS NOT NULL AND kv.exp<=?4', k, J(v), exp, now()).run();
+      return r.meta.changes > 0 ? 'OK' : null;
     }
-  };
-}
-
-function fake() {
-  const m = new Map(), exp = new Map(), blobs = new Map();
-  const alive = k => { const e = exp.get(k); if (e && e < Date.now()) { m.delete(k); exp.delete(k); } };
-  const cl = v => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
-  return {
-    async get(k) { alive(k); return cl(m.has(k) ? m.get(k) : null); },
-    async set(k, v, o) { alive(k); if (o && o.nx && m.has(k)) return null; m.set(k, cl(v)); if (o && o.ex) exp.set(k, Date.now() + o.ex * 1000); else exp.delete(k); return 'OK'; },
-    async del(k) { m.delete(k); exp.delete(k); },
-    async incr(k) { alive(k); const n = (m.get(k) || 0) + 1; m.set(k, n); return n; },
-    async expire(k, s) { exp.set(k, Date.now() + s * 1000); },
-    async hget(k, f) { const h = m.get(k); return h && f in h ? cl(h[f]) : null; },
-    async hset(k, f, v) { const h = m.get(k) || {}; h[f] = cl(v); m.set(k, h); },
-    async hdel(k, f) { const h = m.get(k); if (h) delete h[f]; },
-    async hgetall(k) { const h = m.get(k); return h && Object.keys(h).length ? cl(h) : null; },
-    async hmget(k, fs) { const h = m.get(k) || {}; return fs.map(f => (f in h ? cl(h[f]) : null)); },
-    async zadd(k, s, mem) { const z = m.get(k) || []; z.push([s, mem]); z.sort((a, b) => a[0] - b[0]); m.set(k, z); },
-    async zfrom(k, min, count) { const z = m.get(k) || []; return z.filter(x => x[0] >= min).slice(0, count).map(x => ({ s: x[0], m: x[1] })); },
-    async ztrim() {},
-    async rpush(k, v) { alive(k); const l = m.get(k) || []; l.push(cl(v)); m.set(k, l); },
-    async lpopall(k) { alive(k); const l = m.get(k) || []; m.delete(k); return l; },
-    async blobPut(path, buf) { const u = 'fake://' + path; blobs.set(u, Buffer.from(buf)); return u; },
-    async blobGet(url) { const b = blobs.get(url); return { status: 200, headers: new Map(), body: b }; }
-  };
-}
-
-const get = () => impl || (impl = process.env.MELL_FAKE ? fake() : real());
-module.exports = new Proxy({}, { get: (_, k) => (...a) => get()[k](...a) });
+    await q('INSERT INTO kv(k,v,exp) VALUES(?1,?2,?3) ON CONFLICT(k) DO UPDATE SET v=excluded.v, exp=excluded.exp', k, J(v), exp).run();
+    return 'OK';
+  },
+  async del(k) { await q('DELETE FROM kv WHERE k=?1', k).run(); },
+  async incr(k) {
+    const r = await rows(q("INSERT INTO kv(k,v,exp) VALUES(?1,'1',NULL) ON CONFLICT(k) DO UPDATE SET v=CASE WHEN kv.exp IS NOT NULL AND kv.exp<=?2 THEN '1' ELSE CAST(CAST(kv.v AS INTEGER)+1 AS TEXT) END, exp=CASE WHEN kv.exp IS NOT NULL AND kv.exp<=?2 THEN NULL ELSE kv.exp END RETURNING v", k, now()));
+    return Number(r[0].v);
+  },
+  async expire(k, s) { await q('UPDATE kv SET exp=?2 WHERE k=?1', k, now() + s * 1000).run(); },
+  async hget(k, f) { const r = await q('SELECT v FROM h WHERE k=?1 AND f=?2', k, f).first(); return r ? P(r.v) : null; },
+  async hset(k, f, v) { await q('INSERT INTO h(k,f,v) VALUES(?1,?2,?3) ON CONFLICT(k,f) DO UPDATE SET v=excluded.v', k, f, J(v)).run(); },
+  async hdel(k, f) { await q('DELETE FROM h WHERE k=?1 AND f=?2', k, f).run(); },
+  async hgetall(k) {
+    const r = await rows(q('SELECT f,v FROM h WHERE k=?1', k));
+    if (!r.length) return null;
+    const o = {}; for (const x of r) o[x.f] = P(x.v); return o;
+  },
+  async hmget(k, fs) {
+    const m = {};
+    for (const part of chunks(fs, 90)) {
+      const r = await rows(q('SELECT f,v FROM h WHERE k=?1 AND f IN (' + part.map((_, i) => '?' + (i + 2)).join(',') + ')', k, ...part));
+      for (const x of r) m[x.f] = P(x.v);
+    }
+    return fs.map(f => (f in m ? m[f] : null));
+  },
+  async zadd(k, s, m) { await q('INSERT INTO z(k,m,s) VALUES(?1,?2,?3) ON CONFLICT(k,m) DO UPDATE SET s=excluded.s', k, m, s).run(); },
+  async zfrom(k, min, count) { return (await rows(q('SELECT m,s FROM z WHERE k=?1 AND s>=?2 ORDER BY s LIMIT ?3', k, min, count))).map(x => ({ m: String(x.m), s: Number(x.s) })); },
+  async ztrim(k, keep) { await q('DELETE FROM z WHERE k=?1 AND s <= (SELECT s FROM z WHERE k=?1 ORDER BY s DESC LIMIT 1 OFFSET ?2)', k, keep).run(); },
+  async rpush(k, v) { await q('INSERT INTO l(k,v,ts) VALUES(?1,?2,?3)', k, J(v), now()).run(); },
+  async lpopall(k) {
+    const r = await rows(q('DELETE FROM l WHERE k=?1 RETURNING id,v,ts', k)), min = now() - 60000;
+    return r.sort((a, b) => a.id - b.id).filter(x => x.ts >= min).map(x => P(x.v));
+  },
+  async blobPut(path, buf, mime) {
+    if (!env.FILES) throw new Error('Хранилище файлов R2 не подключено: проверьте binding FILES в wrangler.toml');
+    await env.FILES.put(path, buf, { httpMetadata: { contentType: mime } });
+    return path;
+  },
+  async blobGet(key, range) {
+    let opt, m = range && /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (m && (m[1] || m[2])) opt = { range: m[1] === '' ? { suffix: +m[2] } : m[2] === '' ? { offset: +m[1] } : { offset: +m[1], length: +m[2] - +m[1] + 1 } };
+    const o = await env.FILES.get(key, opt);
+    if (!o) return { status: 404, headers: new Map(), body: Buffer.alloc(0) };
+    const body = Buffer.from(await o.arrayBuffer()), h = new Map();
+    if (opt && o.range) { const off = o.range.offset != null ? o.range.offset : o.size - body.length; h.set('content-range', `bytes ${off}-${off + body.length - 1}/${o.size}`); return { status: 206, headers: h, body }; }
+    return { status: 200, headers: h, body };
+  }
+};

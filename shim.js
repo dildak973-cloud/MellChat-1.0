@@ -10,7 +10,7 @@
   /* адрес можно задать и вручную: открыть сайт как  ...?api=https://ваш-проект.vercel.app  (запомнится в браузере) */
   try { const q = new URLSearchParams(location.search).get('api'); if (q != null) { q ? localStorage.setItem('mell_api', q) : localStorage.removeItem('mell_api'); } } catch (e) {}
   const API = ((window.MELL_CFG && window.MELL_CFG.api) || (function () { try { return localStorage.getItem('mell_api') || ''; } catch (e) { return ''; } })()).replace(/\/+$/, '');
-  const NOAPI = 'Не указан адрес сервера (API_URL). Сайт на GitHub Pages не принимает запросы — впишите адрес Vercel в config.js или откройте сайт как ?api=https://ваш-проект.vercel.app';
+  const NOAPI = 'Не указан адрес сервера (API_URL). Статический хостинг не принимает запросы — впишите адрес вашего Worker в config.js или откройте сайт как ?api=https://имя.workers.dev';
   const TK = 'mell_token';
   const tok = {
     get() { try { return localStorage.getItem(TK) || ''; } catch (e) { return ''; } },

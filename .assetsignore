@@ -1,0 +1,9 @@
+_worker.js
+_routes.json
+wrangler.toml
+README.md
+.gitignore
+.assetsignore
+node_modules
+.git
+.wrangler

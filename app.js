@@ -1,11 +1,9 @@
-/* Mell chat — бэкенд для Vercel (одна функция, маршрутизация по ?op= через routes в vercel.json) */
+/* Mell chat — бэкенд (Cloudflare Worker, вызывается из worker.js; маршрут задаётся параметром op) */
 const crypto = require('crypto');
-const { promisify } = require('util');
-const scrypt = promisify(crypto.scrypt);
 const S = require('./store');
 
 const COLS = ['users', 'chs', 'msgs', 'reads', 'stk', 'pks', 'emo'];
-const MAXDOC = 450e3, MAXF = 4e6, YEAR = 31536000;
+const MAXDOC = 450e3, MAXF = 25e6, YEAR = 31536000;
 const now = () => Date.now();
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 class E extends Error { constructor(code, msg) { super(msg); this.code = code; } }
@@ -41,7 +39,12 @@ async function rl(req, key, max, sec) {
   if (n === 1) await S.expire(k, sec);
   if (n > max) throw new E(429, 'Слишком много попыток, подождите несколько минут');
 }
-const hashPw = async (pw, salt) => (await scrypt(String(pw || ''), salt, 32)).toString('hex');
+/* PBKDF2 (WebCrypto) — в Workers он нативный и быстрый */
+const hashPw = async (pw, salt) => {
+  const enc = new TextEncoder(), key = await globalThis.crypto.subtle.importKey('raw', enc.encode(String(pw || '')), 'PBKDF2', false, ['deriveBits']);
+  const bits = await globalThis.crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(String(salt)), iterations: 100000 }, key, 256);
+  return Buffer.from(bits).toString('hex');
+};
 const samePw = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const UN = /^[a-z0-9_]{3,20}$/;
 
@@ -290,7 +293,7 @@ const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'im
 async function rawBody(req) {
   if (Buffer.isBuffer(req.body)) return req.body;
   const ch = []; let n = 0;
-  for await (const c of req) { n += c.length; if (n > MAXF + 1024) throw new E(413, 'Файл больше 4 МБ (ограничение Vercel)'); ch.push(c); }
+  for await (const c of req) { n += c.length; if (n > MAXF + 1024) throw new E(413, 'Файл больше 25 МБ'); ch.push(c); }
   return Buffer.concat(ch);
 }
 async function upload(req, res, u) {
@@ -299,7 +302,7 @@ async function upload(req, res, u) {
   name = name.replace(/[\\/\0]/g, '_').slice(0, 120) || 'file';
   const buf = await rawBody(req);
   if (!buf.length) throw bad('Пустой файл');
-  if (buf.length > MAXF) throw new E(413, 'Файл больше 4 МБ (ограничение Vercel)');
+  if (buf.length > MAXF) throw new E(413, 'Файл больше 25 МБ');
   const ext = (name.split('.').pop() || '').toLowerCase();
   let mime = MIME[ext] || 'application/octet-stream';
   if (req.headers['x-voice'] && !mime.startsWith('audio/')) mime = 'audio/webm';
